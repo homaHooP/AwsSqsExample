@@ -5,8 +5,15 @@ using Amazon.SQS.Model;
 using AwsSqsExample.models;
 using System.Text.Json;
 
-var sqs = new AmazonSQSClient("","",RegionEndpoint.USEast1);
-string queueUrl = "";
+DotNetEnv.Env.TraversePath().Load();
+
+var queueUrl = Environment.GetEnvironmentVariable("SQS_QUEUE_URL");
+if (string.IsNullOrEmpty(queueUrl))
+{
+    throw new InvalidOperationException("SQS_QUEUE_URL is missing.");
+}
+
+var sqs = new AmazonSQSClient();
 
 async Task SendReq(SupportRequest request)
 {
@@ -54,23 +61,8 @@ async Task<List<SupportRequest>> ReceiveReqs()
 
 async Task<int> EstimateReqCount()
 {
-    ReceiveMessageResponse resp = new ReceiveMessageResponse();
-    int count = 0;
-    do
-    {
-        resp = await sqs.ReceiveMessageAsync(new ReceiveMessageRequest()
-        {
-            QueueUrl = queueUrl,
-            MaxNumberOfMessages = 10,
-            WaitTimeSeconds = 5
-        });
-        if (resp.Messages == null || resp.Messages.Count == 0)
-        {
-            break;
-        }
-        count += resp.Messages.Count;
-    } while (resp.Messages.Count > 0);
-    return count;
+    var attrs = await sqs.GetQueueAttributesAsync(queueUrl, ["ApproximateNumberOfMessages"]);
+    return attrs.ApproximateNumberOfMessages;
 }
 
 
